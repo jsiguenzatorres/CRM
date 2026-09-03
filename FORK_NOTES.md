@@ -33,6 +33,8 @@ El resto (AGPLv3) permite auto-hospedar y modificar libremente, **pero** si corr
 
 ## Arquitectura (resumen para tu revisión)
 
+> Mapa de directorios más detallado (qué hay dentro de `engine/`, `modules/`, `core-modules/` en el server y de `modules/` en el front) en [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+
 Monorepo Nx + Yarn workspaces, ~20 paquetes. Los relevantes para el producto CRM:
 
 | Paquete | Rol |
