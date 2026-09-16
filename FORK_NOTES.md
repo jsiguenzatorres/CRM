@@ -63,5 +63,7 @@ Monorepo Nx + Yarn workspaces, ~20 paquetes. Los relevantes para el producto CRM
 4. **Revisar `.github/workflows`** y podar lo que no aplique a tu infraestructura.
 5. Una vez levantado, puedo ayudarte a revisar módulos específicos (p.ej. `workflow`, `messaging`, permisos) o implementar features concretas que quieras agregar/cambiar.
 
+Comparativa contra otros CRMs open source y el roadmap de diferenciales a incorporar: [`docs/CRM_DESIGN_DOCUMENT.md`](./docs/CRM_DESIGN_DOCUMENT.md).
+
 ---
 *Este archivo lo generó Claude como parte de la importación inicial. No es documentación oficial de Twenty.*
