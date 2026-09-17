@@ -56,6 +56,43 @@ Funcionalidades donde una alternativa gana claramente, mapeadas a dónde irían 
 3. **Fase 3 — Pulido P2**: VoIP, self-serve SaaS, notas de relación enriquecidas.
 4. **Fuera de alcance**: convertirnos en ERP (ERPNext/Odoo) o en plataforma de donaciones/membresías (CiviCRM) — son verticales distintas a las que no apunta este CRM.
 
+## Integración con AsistentesPersonales
+
+Contexto: `AsistentesPersonales` (`C:\Sistemas\AsistentesPersonales`) es la app de asistentes virtuales humanizados que da seguimiento a ventas, capacitaciones, soporte técnico y asistencia tributaria. Cuando un asistente virtual escala un caso a un humano, este CRM debe quedar como el expediente único donde tanto lo atendido por el asistente como por la persona queda documentado y es seguible.
+
+**Decisión: repos y despliegues separados, integrados por API — no fusionar los codebases.**
+
+- Twenty es AGPLv3 con una "Application Exception" pensada exactamente para esto: construir aplicaciones externas contra sus interfaces (REST/GraphQL/webhooks/SDK) sin heredar la licencia. Meter el código de AsistentesPersonales dentro del monorepo y tocar el core sí heredaría AGPLv3.
+- Ciclos de despliegue y perfiles de infra distintos (canales en tiempo real y colas de LLM vs. app web de CRM).
+
+### Modelo de datos: objeto `Case`
+
+Un único objeto de metadata (definido vía `twenty-sdk` / `defineObject`, sin tocar el core) representa cada atención, sea resuelta por el asistente virtual o escalada a un humano. No hace falta un objeto separado de "evento": el `Note` y el `Timeline` que Twenty ya genera automáticamente por objeto (`modules/note`, `modules/timeline`) sirven como bitácora de la conversación.
+
+| Campo | Tipo | Notas |
+|---|---|---|
+| `type` | Select | `sales` \| `training` \| `support` \| `tax` — ampliable |
+| `channel` | Select | `whatsapp` \| `web-chat` \| `voice` \| `email`, etc. |
+| `status` | Select | `open` → `in_progress` → `escalated` → `resolved` → `closed` |
+| `externalConversationId` | Texto (único) | ID de la conversación en AsistentesPersonales — clave de idempotencia para no duplicar el `Case` en reintentos |
+| `handledByAssistant` | Texto | Qué asistente virtual lo atendió inicialmente |
+| `assignee` | Relación a `WorkspaceMember` | Se completa al escalar a un humano |
+| `escalationReason` | Texto | Por qué el asistente no pudo resolverlo solo |
+| `person` / `company` | Relación a objetos existentes | Buscar-o-crear por teléfono/email al recibir el primer mensaje del contacto |
+
+### Contrato de API
+
+1. **Autenticación**: API key de workspace (`engine/core-modules/api-key`) guardada solo en el backend de AsistentesPersonales — nunca en un cliente/canal expuesto.
+2. **Alta/actualización de caso**: AsistentesPersonales llama a las mutations GraphQL que Twenty autogenera para `Case` (`createCase`/`updateCase`) — no hay que escribir endpoints a mano en el CRM, es el mismo mecanismo metadata-driven de cualquier objeto custom.
+3. **Bitácora**: cada turno relevante de la conversación se documenta creando un `Note` enlazado al `Case`, en vez de mandar el transcript completo como un solo campo — así queda navegable en la UI del CRM igual que el resto de las notas.
+4. **Escalamiento**: AsistentesPersonales actualiza `status: escalated` y deja `assignee` sin asignar (a la cola). Un `Workflow` (motor ya existente en `modules/workflow`, ver diferencial P1 de automatización avanzada) dispara la notificación al equipo humano — no hace falta lógica de notificación nueva del lado de AsistentesPersonales.
+5. **Vuelta del humano al asistente**: se registra un webhook saliente de Twenty sobre el objeto `Case` (nota nueva o cambio de `status` a `resolved`) apuntando a un endpoint de AsistentesPersonales, para que el canal original (WhatsApp/web/voz) reciba la respuesta del humano o el cierre del caso.
+
+### Pendiente de validar
+
+- Si `core-modules/api-key` soporta scoping por objeto (limitar la key solo a `Case`/`Note`) o si hay que tratarla como acceso amplio y compensar con una key dedicada solo para esta integración.
+- Formato exacto del payload de los webhooks salientes de Twenty (revisar `engine/core-modules` en el código antes de implementar el receptor en AsistentesPersonales).
+
 ## Próximos pasos
 
 - Validar prioridades con necesidades reales de uso (no todas las P0/P1 aplican si el caso de uso no incluye marketing por email, por ejemplo).
