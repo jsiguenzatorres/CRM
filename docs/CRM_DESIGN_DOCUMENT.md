@@ -28,8 +28,8 @@ Ya lo elegimos como base del fork (ver `FORK_NOTES.md`) y la comparativa lo conf
 - Es, con diferencia, el más popular y de mayor tracción (56.9k stars vs. 3-24k del resto de CRMs puros).
 - Stack moderno (React 18 + NestJS + GraphQL) frente a PHP monolítico de EspoCRM/SuiteCRM/CiviCRM — más fácil de mantener y de que un modelo de lenguaje genere código correcto en él.
 - Modelo de datos metadata-driven (objetos/campos custom sin migración manual) es superior al de la mayoría — solo ERPNext ofrece algo comparable, pero acoplado a un ERP completo que no necesitamos.
-- Primer CRM open source con posicionamiento "AI-first" real (MCP server) — encaja con hacia dónde va el mercado, y con el hecho de que este mismo proyecto se desarrolla con asistencia de IA.
-- Reseñas 2026 lo marcan como el mejor pick para "equipos tech-forward" dispuestos a asumir su falta de automatización de marketing — ese hueco es exactamente lo que este documento propone tapar con diferenciales de otros proyectos, no cambiando de base.
+- Primer CRM open source con posicionamiento "AI-first" real — y tras el mapeo funcional (`docs/FUNCTIONAL_MAP.md` § 4) esto se confirmó con mucho más detalle del esperado: chat multi-agente, agentes personalizables con evals, servidor MCP, meta-tools que dejan que la IA administre workflows/dashboards/campañas completos, y code interpreter con sandbox — todo libre, sin gating Enterprise.
+- Las reseñas 2026 usadas en la comparación original decían que a Twenty le faltaba automatización de marketing; el mapeo funcional mostró que eso ya está resuelto en el código (`modules/emailing`). Esas reseñas hablaban de una versión desactualizada o de la oferta cloud, no de este código self-hosted.
 
 **Decisión: no migrar de base.** Seguimos sobre Twenty y le incorporamos los diferenciales de abajo.
 
@@ -37,24 +37,27 @@ Ya lo elegimos como base del fork (ver `FORK_NOTES.md`) y la comparativa lo conf
 
 Funcionalidades donde una alternativa gana claramente, mapeadas a dónde irían en la arquitectura actual (`docs/ARCHITECTURE.md`) y priorizadas.
 
-| Prioridad | Diferencial | Origen | Dónde iría |
+> **Actualizado tras el mapeo funcional completo** (`docs/FUNCTIONAL_MAP.md`, código leído directamente): varios de estos ítems ya estaban resueltos en el código de Twenty y las reseñas externas usadas en la comparación original estaban desactualizadas o hablaban de la oferta cloud, no del código self-hosted. Detalle de cada corrección en `docs/FUNCTIONAL_MAP.md` § 6.
+
+| Prioridad | Diferencial | Origen | Estado real / dónde iría |
 |---|---|---|---|
-| **P0** | Email marketing masivo con listas de segmentación, tracking de aperturas/clics y plantillas | EspoCRM | Nuevo módulo `modules/email-campaign` en `twenty-server`, reusando el `emailing` module existente como base de envío |
-| **P0** | Report builder visual sin código (más allá de `dashboard/` actual) | EspoCRM | Extender `engine/metadata-modules` con definición de reportes agregados + UI en `twenty-front/modules/dashboards` |
-| **P1** | Motor de automatización multi-paso más robusto (branching, esperas, aprobaciones) | SuiteCRM (AOW) | Ampliar `modules/workflow` existente — ya tiene triggers/steps, falta profundidad de condicionales y aprobaciones humanas |
-| **P1** | Portal de autoservicio para clientes externos (ver/comentar sus propios casos u oportunidades) | SuiteCRM | Nuevo módulo con auth de rol limitado, separado de `workspace-member`, en `engine/core-modules/` |
-| **P1** | Cotizaciones/contratos/proposals con PDF generado y firma | SuiteCRM | Nuevo módulo `modules/quote`, reusando `attachment` y `twenty-emails` para envío |
-| **P2** | Log de llamadas con integración VoIP (click-to-call, grabación) | EspoCRM | Extender `modules/call-recording` existente (ya soporta grabación) para soportar más proveedores VoIP |
-| **P2** | Empaquetado multi-tenant SaaS "listo para vender" (self-serve signup, billing por tenant) | Krayin | Ya existe base multi-tenant por workspace (`engine/workspace-manager`); falta la capa de self-serve signup + billing, hoy gateada como feature Enterprise |
+| ~~P0~~ ✅ | ~~Email marketing masivo~~ | EspoCRM | **Ya existe.** `modules/emailing` tiene campañas, listas, plantillas, supresión/unsubscribe y billing por envío completos. |
+| **P2** (bajado de P0) | Report builder 100% manual/sin-código (sin depender del chat de IA) | EspoCRM | Ya cubierto parcialmente por `dashboard/chart-data` (agregaciones) + IA conversacional para armar dashboards. Falta el flujo manual puro para quien no quiera usar IA. |
+| **P1** (acotado) | Step de **aprobación humana** dentro de un workflow (esperar que una persona apruebe antes de continuar) | SuiteCRM (AOW) | El resto de "automatización robusta" ya existe (`modules/workflow`: condicionales, loops, formularios, HTTP, cron, webhooks, paso de IA) — falta específicamente este step |
+| **P1** | Portal de autoservicio para clientes externos (ver/comentar sus propios casos u oportunidades) | SuiteCRM | Gap real confirmado. Nuevo módulo con auth de rol limitado, separado de `workspace-member`, en `engine/core-modules/` |
+| **P1** | Cotizaciones/contratos/proposals con PDF generado y firma | SuiteCRM | Gap real confirmado. Nuevo módulo `modules/quote`, reusando `attachment` y `twenty-emails` para envío |
+| **P2** (acotado) | Click-to-call e integración de proveedores VoIP | EspoCRM | `modules/call-recording` ya modela grabación + transcript + summary ligados a eventos de calendario — falta la integración VoIP en sí |
+| **Decisión legal, no técnica** | Empaquetado multi-tenant SaaS "listo para vender" (self-serve signup, billing por tenant) | Krayin | **Ya existe en código** (Stripe, planes, entitlements, créditos) pero la carpeta `billing/` completa está bajo `@license Enterprise` de Twenty.com. Definir: pagar licencia comercial, o construir billing propio no derivado de ese código |
 | **P2** | Notas de relación enriquecidas (fechas importantes, contexto personal por contacto) | Monica | Extender `modules/note` / `modules/person` con campos custom vía metadata — no requiere código nuevo, solo definir el objeto |
 | **P3 (evaluar, no comprometido)** | Integración nativa con contabilidad/inventario | ERPNext | Fuera de alcance por ahora: implica ser un ERP, no un CRM. Si se necesita, integrar por API con un sistema contable externo en vez de construirlo |
 
 ## Fases propuestas
 
-1. **Fase 1 — Cerrar brechas P0**: email marketing y reporting sin código. Son las dos razones más citadas para no elegir Twenty hoy.
-2. **Fase 2 — Diferenciales P1**: automatización avanzada, portal de cliente, cotizaciones. Estos acercan a paridad con SuiteCRM en el segmento "enterprise self-hosted".
-3. **Fase 3 — Pulido P2**: VoIP, self-serve SaaS, notas de relación enriquecidas.
-4. **Fuera de alcance**: convertirnos en ERP (ERPNext/Odoo) o en plataforma de donaciones/membresías (CiviCRM) — son verticales distintas a las que no apunta este CRM.
+1. **Fase 1 — Gaps P1 confirmados**: portal de autoservicio para clientes y cotizaciones/contratos. Son los únicos diferenciales de la comparación que siguen siendo huecos reales tras el mapeo funcional.
+2. **Fase 2 — Acotados**: step de aprobación humana en workflows, integración VoIP sobre `call-recording`.
+3. **Fase 3 — Pulido P2**: report builder 100% manual, notas de relación enriquecidas.
+4. **Decisión pendiente (no técnica)**: si se necesita empaquetar esto como SaaS multi-tenant facturable, definir si se paga la licencia Enterprise de Twenty.com (el código de billing ya existe) o se construye un billing propio.
+5. **Fuera de alcance**: convertirnos en ERP (ERPNext/Odoo) o en plataforma de donaciones/membresías (CiviCRM) — son verticales distintas a las que no apunta este CRM.
 
 ## Integración con AsistentesPersonales
 

@@ -65,5 +65,7 @@ Monorepo Nx + Yarn workspaces, ~20 paquetes. Los relevantes para el producto CRM
 
 Comparativa contra otros CRMs open source y el roadmap de diferenciales a incorporar: [`docs/CRM_DESIGN_DOCUMENT.md`](./docs/CRM_DESIGN_DOCUMENT.md).
 
+Inventario funcional completo (qué hace cada módulo, configuración, interfaces, y todo el uso real de IA): [`docs/FUNCTIONAL_MAP.md`](./docs/FUNCTIONAL_MAP.md).
+
 ---
 *Este archivo lo generó Claude como parte de la importación inicial. No es documentación oficial de Twenty.*
