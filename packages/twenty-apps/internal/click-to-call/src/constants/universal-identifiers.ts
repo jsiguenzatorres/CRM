@@ -14,3 +14,13 @@ export const CALL_FRONT_COMPONENT_UNIVERSAL_IDENTIFIER =
   'a975028a-f8af-4908-b251-84316268c562';
 export const CALL_PERSON_COMMAND_UNIVERSAL_IDENTIFIER =
   'a915d1af-87cc-4f5c-9f8a-d2cf992a48cf';
+
+// Server variable (env var) names for the Fase 2 Twilio Voice integration.
+// These are keys into `process.env` inside logic functions at runtime, not
+// universal identifiers — see docs/CLICK_TO_CALL_DESIGN.md.
+export const TWILIO_ACCOUNT_SID_ENV_VAR_NAME = 'TWILIO_ACCOUNT_SID';
+export const TWILIO_AUTH_TOKEN_ENV_VAR_NAME = 'TWILIO_AUTH_TOKEN';
+export const TWILIO_API_KEY_SID_ENV_VAR_NAME = 'TWILIO_API_KEY_SID';
+export const TWILIO_API_KEY_SECRET_ENV_VAR_NAME = 'TWILIO_API_KEY_SECRET';
+export const TWILIO_TWIML_APP_SID_ENV_VAR_NAME = 'TWILIO_TWIML_APP_SID';
+export const TWILIO_CALLER_ID_ENV_VAR_NAME = 'TWILIO_CALLER_ID';
