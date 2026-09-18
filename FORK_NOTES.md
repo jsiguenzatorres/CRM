@@ -67,5 +67,7 @@ Comparativa contra otros CRMs open source y el roadmap de diferenciales a incorp
 
 Inventario funcional completo (qué hace cada módulo, configuración, interfaces, y todo el uso real de IA): [`docs/FUNCTIONAL_MAP.md`](./docs/FUNCTIONAL_MAP.md).
 
+Diseño e implementación en curso de los diferenciales P1: portal de autoservicio ([`docs/CUSTOMER_PORTAL_DESIGN.md`](./docs/CUSTOMER_PORTAL_DESIGN.md)) y cotizaciones/contratos ([`docs/QUOTES_DESIGN.md`](./docs/QUOTES_DESIGN.md)).
+
 ---
 *Este archivo lo generó Claude como parte de la importación inicial. No es documentación oficial de Twenty.*
