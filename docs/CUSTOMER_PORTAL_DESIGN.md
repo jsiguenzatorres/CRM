@@ -2,7 +2,18 @@
 
 Diseño del diferencial P1 "portal de autoservicio" listado en `docs/CRM_DESIGN_DOCUMENT.md`. Basado en patrones reales del código (`auth/token/`, `engine/core-modules/api-key/`), verificados por lectura directa.
 
-**Limitación de este entorno, para ser honesto sobre el alcance de esta sesión**: el sandbox donde corro tiene Node 22.22 (el repo pide 24.16 en `.nvmrc`) y no tiene Postgres/Redis corriendo — no puedo compilar, tipar, generar la migración de TypeORM ni correr nada de este código. Por eso esto queda como **diseño + bocetos de código de referencia** (en bloques de código dentro de este doc, no archivos ya integrados al build), no como una feature terminada. La sección final tiene el plan paso a paso para implementarlo en una máquina con el toolchain completo.
+**Limitación de este entorno, para ser honesto sobre el alcance de esta sesión**: el sandbox donde corro tiene Node 22.22 (el repo pide 24.16 en `.nvmrc`) y no tiene Postgres/Redis corriendo — no puedo compilar, tipar, generar la migración de TypeORM ni correr nada de este código. Por eso lo que sigue es un mix: piezas que **ya son archivos reales en el repo** (entidad, enum de JWT, tipos de payload — no requieren generación de código ni el toolchain completo para escribirse a mano) y piezas que quedan como **bocetos de referencia** (guard, resolver, frontend) porque wirearlas mal sin poder compilar sería peor que no tocarlas. La sección final tiene el plan paso a paso para lo que falta.
+
+### Progreso
+
+| Pieza | Estado |
+|---|---|
+| `PortalAccessEntity` | ✅ Archivo real: `packages/twenty-server/src/engine/core-modules/customer-portal/portal-access.entity.ts` |
+| `JwtTokenTypeEnum.PORTAL_LOGIN` / `PORTAL_ACCESS` | ✅ Agregados al enum real: `auth/types/jwt-token-type.enum.ts` |
+| `PortalLoginJwtPayload` / `PortalAccessJwtPayload` | ✅ Archivos reales: `customer-portal/types/*.type.ts` |
+| Migración de la tabla `portalAccess` | ⚠️ Sigue pendiente — **no la escribí a mano**, ver la corrección importante más abajo sobre por qué |
+| `PortalAuthService`, `PortalAuthGuard`, `PortalCaseResolver` | 📝 Bocetos (sin cambios) |
+| Frontend del portal | 📝 Boceto (sin cambios) |
 
 ## Alcance del MVP
 
@@ -113,11 +124,67 @@ Sin sidebar, sin command menu, sin acceso a ninguna otra parte del CRM — es un
 - Aislamiento por workspace: el JWT lleva `workspaceId` y el guard lo valida contra la conexión de datos del workspace correcto, igual que hace `WorkspaceAuthGuard` hoy para usuarios internos.
 - Un admin desactiva `PortalAccessEntity.isActive` para cortar el acceso sin tocar el `Person` ni sus datos.
 
+## Corrección importante: cómo se migra de verdad la tabla `portalAccess`
+
+El plan original asumía que crear una tabla nueva en el schema `core` era una migración TypeORM común. Es falso, y vale la pena dejarlo explícito porque no es obvio: **el sistema de migraciones TypeORM del schema `core` está congelado**. La propia config lo dice (`database/typeorm/core/core.datasource.ts`):
+
+> "The TypeORM migration system is frozen — historical migrations live in `legacy-typeorm-migrations-do-not-add/` [...]. Do NOT add new files there: write a fast/slow instance command instead."
+
+En su lugar, Twenty reemplazó las migraciones por **"instance commands"** versionados (`packages/twenty-server/docs/UPGRADE_COMMANDS.md`): archivos con timestamp bajo `database/commands/upgrade-version-command/<versión-actual>/`, registrados con el decorador `@RegisteredInstanceCommand('<versión>', <timestamp>)`, que implementan `up`/`down` con SQL crudo vía `QueryRunner`. Se generan así:
+
+```bash
+npx nx run twenty-server:database:migrate:generate --name add_portal_access_table --type fast
+```
+
+Ese comando (no lo pude correr acá, necesita el toolchain completo) crea el archivo en la carpeta de la versión actual (`TWENTY_CURRENT_VERSION`, hoy `2.35.0` → carpeta `2-35/`, que todavía no existe) **y lo auto-registra** en `instance-commands.constant.ts` — ese archivo de registro no se edita a mano.
+
+**Por qué no lo escribí a mano yo mismo**: hacerlo sin correr el generador dejaría el archivo sin registrar (el pipeline de upgrade nunca lo ejecutaría) y sin el timestamp/carpeta de versión correctos que la CI valida (ver gotcha de `CLAUDE.md` sobre `upgrade-version-command/`). Es un caso real donde escribir el código "a mano" sería peor que no tocarlo.
+
+**Referencia exacta a seguir** una vez generado el archivo (mirando `2-5/2-5-instance-command-fast-1778550000000-create-signing-key-table.ts`, el caso más parecido — otra tabla nueva de infraestructura de auth en `core`):
+
+```ts
+import { type QueryRunner } from 'typeorm';
+
+import { RegisteredInstanceCommand } from 'src/engine/core-modules/upgrade/decorators/registered-instance-command.decorator';
+import { type FastInstanceCommand } from 'src/engine/core-modules/upgrade/interfaces/fast-instance-command.interface';
+
+@RegisteredInstanceCommand('2.35.0', /* timestamp real que ponga el generador */)
+export class AddPortalAccessTableFastInstanceCommand implements FastInstanceCommand {
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `CREATE TABLE IF NOT EXISTS "core"."portalAccess" (
+        "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
+        "workspaceId" uuid NOT NULL,
+        "personId" uuid NOT NULL,
+        "email" text NOT NULL,
+        "isActive" boolean NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+        "lastLoginAt" TIMESTAMP WITH TIME ZONE,
+        CONSTRAINT "PK_portalAccess_id" PRIMARY KEY ("id"),
+        CONSTRAINT "FK_portalAccess_workspaceId" FOREIGN KEY ("workspaceId") REFERENCES "core"."workspace"("id") ON DELETE CASCADE
+      )`,
+    );
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX IF NOT EXISTS "IDX_PORTAL_ACCESS_WORKSPACE_ID_EMAIL_UNIQUE" ON "core"."portalAccess" ("workspaceId", "email")`,
+    );
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "core"."IDX_PORTAL_ACCESS_WORKSPACE_ID_EMAIL_UNIQUE"`,
+    );
+    await queryRunner.query(`DROP TABLE IF EXISTS "core"."portalAccess"`);
+  }
+}
+```
+
+(El nombre de clase, el índice único y el `FK ... ON DELETE CASCADE` a `workspace` deben terminar coincidiendo exactamente con lo que declara `PortalAccessEntity` — que ya es un archivo real en el repo — para que TypeORM y la tabla real no diverjan.)
+
 ## Plan de implementación (para retomar en una máquina con el toolchain completo)
 
-1. `PortalAccessEntity` (entidad `core`, no workspace-entity) + `npx nx run twenty-server:database:migrate:generate --name add_portal_access --type fast`.
-2. Agregar `PORTAL_LOGIN` / `PORTAL_ACCESS` a `JwtTokenTypeEnum` + sus tipos de payload en `auth/types/`.
-3. `PortalAuthService` (pedir/verificar magic link, emitir sesión) — implementar sobre el boceto de arriba.
+1. ~~`PortalAccessEntity`~~ ✅ ya existe. ~~Agregar `PORTAL_LOGIN`/`PORTAL_ACCESS` a `JwtTokenTypeEnum` + tipos de payload~~ ✅ ya existe.
+2. Correr `npx nx run twenty-server:database:migrate:generate --name add_portal_access_table --type fast` y completar `up`/`down` con la referencia de arriba.
+3. `PortalAuthService` (pedir/verificar magic link, emitir sesión) — implementar sobre el boceto ya escrito más arriba.
 4. `PortalAuthGuard`.
 5. `PortalCaseResolver` (`myCases`, `addCaseComment`) — la parte más sensible, revisar con cuidado el chequeo `person.id === ctx.personId`.
 6. Frontend: `customer-portal/` (login, lista, detalle) como bundle/ruta separada.
