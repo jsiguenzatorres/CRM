@@ -69,5 +69,7 @@ Inventario funcional completo (qué hace cada módulo, configuración, interface
 
 Diseño e implementación en curso de los diferenciales P1/P2: portal de autoservicio ([`docs/CUSTOMER_PORTAL_DESIGN.md`](./docs/CUSTOMER_PORTAL_DESIGN.md)), cotizaciones/contratos ([`docs/QUOTES_DESIGN.md`](./docs/QUOTES_DESIGN.md)), step de aprobación humana en workflows ([`docs/WORKFLOW_APPROVAL_DESIGN.md`](./docs/WORKFLOW_APPROVAL_DESIGN.md)) y click-to-call ([`docs/CLICK_TO_CALL_DESIGN.md`](./docs/CLICK_TO_CALL_DESIGN.md)).
 
+Plan de despliegue e integración con AsistentesPersonales (Supabase, GitHub, VPS): [`docs/INTEGRATION_PLAN.md`](./docs/INTEGRATION_PLAN.md).
+
 ---
 *Este archivo lo generó Claude como parte de la importación inicial. No es documentación oficial de Twenty.*
