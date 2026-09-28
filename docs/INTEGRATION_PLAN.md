@@ -64,17 +64,18 @@ Autorizada el 2026-09-28. Estado:
 | Traer a la rama de trabajo el commit que solo estaba en la rama por defecto | Hecho |
 | Borrar los workflows heredados | Hecho, los 46 |
 | `build-image.yaml` | Hecho |
-| PR hacia la rama por defecto y merge | Ver historial del repo |
-| Crear `main` | Ver historial del repo |
+| PR hacia la rama por defecto y merge | Hecho, PR #1 |
+| Crear `main` | Hecho, en `d338166c` |
 | Marcar `main` como rama por defecto y protegerla | Pendiente del usuario (Settings del repo; no hay herramienta para hacerlo desde acá) |
-| Visibilidad del paquete en GHCR | Pendiente del usuario, después del primer build |
+| Primer build de la imagen | Hecho: run 1 en unos 14 minutos, publicó `ghcr.io/jsiguenzatorres/crm:d338166c723415aa90d480097cfe9274222723c2` y `:main` |
+| Visibilidad del paquete en GHCR | Público: las dos etiquetas se descargan sin autenticación |
 
 1. **Podar workflows**: los 46 workflows heredados apuntan a infraestructura de Twenty Inc. (Depot, Nx Cloud, Chromatic, secretos que no existen acá). Borrarlos todos antes de crear `main`, porque varios se disparan con push a `main` y fallarían en cadena.
 2. **Workflow propio `build-image.yaml`**: en push a `main` y manual. Construye la etapa final `twenty` de `packages/twenty-docker/twenty/Dockerfile` con contexto en la raíz del repo y publica `ghcr.io/jsiguenzatorres/crm:<sha>` y `:main`. Usa `GITHUB_TOKEN` con `packages: write`, sin secretos extra. Como el repo es público, el runner estándar tiene 16 GB de RAM, suficiente para el build del front (pide 8 GB de heap). La imagen de Twenty upstream (`twentycrm/twenty`) no sirve porque no incluye nuestros cambios.
 3. **Crear `main`**: PR de `claude/memanto-context-analysis-vj7ux7` hacia `claude/crm-review-improve-ffjij5`, y desde ahí crear `main`, marcarla como rama por defecto y protegerla (merge solo por PR). Las sesiones de Claude Code siguen trabajando en ramas `claude/*` y entran a `main` por PR.
 4. **Más adelante**: un job de deploy por SSH (`VPS_HOST`, `VPS_SSH_KEY` como secretos) que haga `docker compose pull && docker compose up -d`. Al principio el deploy es manual.
 
-El primer build publica el paquete `crm` en GHCR. Si queda privado, el VPS necesita `docker login ghcr.io` con un token con permiso `read:packages`. Como el código ya es público (AGPL), lo más simple es marcar el paquete como público: la imagen no lleva secretos, que van en el `.env` del VPS. `.github/actions/` queda tal cual: son acciones compuestas que ya nadie usa, sirven de referencia si más adelante se recupera algún job de CI de upstream. `dependabot.yml` también queda: tiene las actualizaciones de versión en 0 y solo deja pasar las de seguridad.
+El paquete `crm` en GHCR es público, así que el VPS descarga la imagen sin `docker login`. La imagen no lleva secretos: van en el `.env` del VPS. `.github/actions/` queda tal cual: son acciones compuestas que ya nadie usa, sirven de referencia si más adelante se recupera algún job de CI de upstream. `dependabot.yml` también queda: tiene las actualizaciones de versión en 0 y solo deja pasar las de seguridad.
 
 ## Fase 2: VPS
 
