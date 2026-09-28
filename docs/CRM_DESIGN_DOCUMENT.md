@@ -97,6 +97,19 @@ Verificado en el código: Twenty **no tiene integración de WhatsApp**. En `twen
 
 **Decisión: el canal WhatsApp (escribir, llamar, contestar) lo implementa y posee AsistentesPersonales**, vía la API de WhatsApp Business/Twilio/proveedor equivalente — no se construye un driver de WhatsApp dentro de este CRM. La integración con Twenty se limita a lo ya definido arriba: cada interacción por WhatsApp se documenta como un `Case` con `channel: whatsapp`, y el `externalConversationId` guarda el identificador de esa conversación de WhatsApp para poder correlacionarla del lado de AsistentesPersonales. Si en el futuro se necesitara ver el hilo de WhatsApp *dentro* de la ficha del `Case` en el CRM, alcanza con que AsistentesPersonales cree un `Note` por mensaje relevante (como ya se definió en el contrato de API) — no hace falta que Twenty hable con la API de WhatsApp directamente.
 
+### Infraestructura: un solo proyecto de Supabase, dos aplicaciones separadas
+
+Decisión tomada el 2026-09-28 por costo. Supabase factura el plan Pro por **organización**, no por proyecto: agregar tablas o schemas a un proyecto existente no tiene costo extra mientras el uso quede dentro de lo incluido (8 GB de base de datos por proyecto, 250 GB de egress, créditos de cómputo). En cambio, un **segundo proyecto** necesita su propia instancia de cómputo dedicada, y el crédito de cómputo del plan solo cubre una: suma aproximadamente US$10–25/mes. (Cifras cruzadas de varias fuentes de 2026 que citan `supabase.com/pricing`; conviene reconfirmarlas antes de presupuestar.)
+
+**Decisión**: el CRM usa el **mismo proyecto de Supabase** que AsistentesPersonales, pero los **códigos y despliegues siguen separados** (todo lo dicho arriba sobre licencia AGPLv3 y ciclos de despliegue distintos sigue valiendo). Compartir la instancia de Postgres no implica fusionar las aplicaciones:
+
+- Twenty apunta su `PG_DATABASE_URL` al proyecto existente y crea ahí sus propios schemas (`core` + uno por workspace). Postgres aísla por nombre de schema, así que no toca las tablas de AsistentesPersonales ni sus migraciones conviven con las de la otra app.
+- **Condición previa**: confirmar que AsistentesPersonales no use ya un schema llamado `core` ni con prefijo `workspace_`.
+- **Redis va aparte sí o sí**: Supabase no ofrece Redis administrado, y Twenty lo necesita (cache y colas BullMQ). Se resuelve con un proveedor externo (por ejemplo Upstash) o un contenedor en el VPS; esto no depende de la decisión de compartir Postgres.
+- **Límites a vigilar**: el cupo de 8 GB es por proyecto, así que la suma de datos de ambas apps cuenta contra el mismo límite (el ahorro está en no pagar un segundo cómputo, no en el almacenamiento). Ambas apps comparten CPU, RAM y conexiones de la misma instancia: usar el pooler de conexiones de Supabase en las dos, y si alguna crece mucho, separarlas después es directo porque los schemas ya son independientes.
+
+El plan de trabajo completo de integración (Supabase, GitHub, VPS) se documenta aparte, en `docs/INTEGRATION_PLAN.md` (en preparación).
+
 ### Pendiente de validar
 
 - Si `core-modules/api-key` soporta scoping por objeto (limitar la key solo a `Case`/`Note`) o si hay que tratarla como acceso amplio y compensar con una key dedicada solo para esta integración.
