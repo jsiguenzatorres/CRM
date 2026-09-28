@@ -33,6 +33,8 @@ El resto (AGPLv3) permite auto-hospedar y modificar libremente, **pero** si corr
 
 ## Arquitectura (resumen para tu revisión)
 
+> Mapa de directorios más detallado (qué hay dentro de `engine/`, `modules/`, `core-modules/` en el server y de `modules/` en el front) en [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md).
+
 Monorepo Nx + Yarn workspaces, ~20 paquetes. Los relevantes para el producto CRM:
 
 | Paquete | Rol |
@@ -60,6 +62,14 @@ Monorepo Nx + Yarn workspaces, ~20 paquetes. Los relevantes para el producto CRM
 3. **Levantar el entorno local** (Node 24 + Docker) y correr `yarn start` para verificar que todo funciona antes de personalizar.
 4. **Revisar `.github/workflows`** y podar lo que no aplique a tu infraestructura.
 5. Una vez levantado, puedo ayudarte a revisar módulos específicos (p.ej. `workflow`, `messaging`, permisos) o implementar features concretas que quieras agregar/cambiar.
+
+Comparativa contra otros CRMs open source y el roadmap de diferenciales a incorporar: [`docs/CRM_DESIGN_DOCUMENT.md`](./docs/CRM_DESIGN_DOCUMENT.md).
+
+Inventario funcional completo (qué hace cada módulo, configuración, interfaces, y todo el uso real de IA): [`docs/FUNCTIONAL_MAP.md`](./docs/FUNCTIONAL_MAP.md).
+
+Diseño e implementación en curso de los diferenciales P1/P2: portal de autoservicio ([`docs/CUSTOMER_PORTAL_DESIGN.md`](./docs/CUSTOMER_PORTAL_DESIGN.md)), cotizaciones/contratos ([`docs/QUOTES_DESIGN.md`](./docs/QUOTES_DESIGN.md)), step de aprobación humana en workflows ([`docs/WORKFLOW_APPROVAL_DESIGN.md`](./docs/WORKFLOW_APPROVAL_DESIGN.md)) y click-to-call ([`docs/CLICK_TO_CALL_DESIGN.md`](./docs/CLICK_TO_CALL_DESIGN.md)).
+
+Plan de despliegue e integración con AsistentesPersonales (Supabase, GitHub, VPS): [`docs/INTEGRATION_PLAN.md`](./docs/INTEGRATION_PLAN.md).
 
 ---
 *Este archivo lo generó Claude como parte de la importación inicial. No es documentación oficial de Twenty.*
