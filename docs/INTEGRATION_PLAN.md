@@ -27,7 +27,7 @@ La decisión del 2026-09-28 ("mismo proyecto de Supabase que AsistentesPersonale
 | B. Proyecto en la org Pro | ~US$10/mes por un cómputo Micro nuevo, o US$0 reusando uno existente con espacio | Administrado, backups diarios, 8 GB | Twenty hace muchas consultas por request: si el VPS no está cerca de la región del proyecto, se nota en la UI. Requiere los ajustes del Anexo |
 | C. Proyecto Free de AsistentesPersonales | US$0 | Ninguno funcional | 500 MB y cómputo nano compartidos con producción de AsistentesPersonales, otra cuenta, sin backups |
 
-**Recomendación: A**, siempre que el VPS tenga RAM libre (ver Fase 0). Si no alcanza, B en un proyecto de la org Pro creado en la región más cercana al VPS. C queda descartada.
+**Decisión (2026-09-28): A**, confirmada por el usuario. Si la Fase 0 muestra que al VPS no le alcanza la RAM, el plan B es un proyecto de la org Pro creado en la región más cercana al VPS. C queda descartada.
 
 Fuera del alcance del CRM pero relevante: AsistentesPersonales corre en producción, con clientes reales, sobre un proyecto Free. Conviene evaluar aparte transferirlo a la org Pro (Supabase permite transferir un proyecto a otra organización si tu usuario es owner de ambas) para tener backups.
 
@@ -50,19 +50,31 @@ Decisiones:
 
 | # | Decisión | Recomendación |
 |---|---|---|
-| D1 | Dónde vive la base del CRM | Opción A (Postgres en el VPS) |
+| D1 | Dónde vive la base del CRM | **Decidido: opción A** (Postgres en el VPS) |
 | D2 | Dominio | `crm.ianovatechsystems.com`, registro A apuntando a la IP del VPS |
 | D3 | Cómo se mapean los tenants de AsistentesPersonales a Twenty | Un workspace para NovaTech ahora. Del lado de AsistentesPersonales, la configuración del CRM se guarda por tenant (nullable), así las otras firmas se suman después sin rediseñar |
 | D4 | Dónde guarda Twenty los archivos adjuntos | Volumen local (`STORAGE_TYPE=local`) incluido en el backup. S3 solo si el disco del VPS queda justo |
 
 ## Fase 1: GitHub
 
+Autorizada el 2026-09-28. Estado:
+
+| Paso | Estado |
+|---|---|
+| Traer a la rama de trabajo el commit que solo estaba en la rama por defecto | Hecho |
+| Borrar los workflows heredados | Hecho, los 46 |
+| `build-image.yaml` | Hecho |
+| PR hacia la rama por defecto y merge | Ver historial del repo |
+| Crear `main` | Ver historial del repo |
+| Marcar `main` como rama por defecto y protegerla | Pendiente del usuario (Settings del repo; no hay herramienta para hacerlo desde acá) |
+| Visibilidad del paquete en GHCR | Pendiente del usuario, después del primer build |
+
 1. **Podar workflows**: los 46 workflows heredados apuntan a infraestructura de Twenty Inc. (Depot, Nx Cloud, Chromatic, secretos que no existen acá). Borrarlos todos antes de crear `main`, porque varios se disparan con push a `main` y fallarían en cadena.
 2. **Workflow propio `build-image.yaml`**: en push a `main` y manual. Construye la etapa final `twenty` de `packages/twenty-docker/twenty/Dockerfile` con contexto en la raíz del repo y publica `ghcr.io/jsiguenzatorres/crm:<sha>` y `:main`. Usa `GITHUB_TOKEN` con `packages: write`, sin secretos extra. Como el repo es público, el runner estándar tiene 16 GB de RAM, suficiente para el build del front (pide 8 GB de heap). La imagen de Twenty upstream (`twentycrm/twenty`) no sirve porque no incluye nuestros cambios.
 3. **Crear `main`**: PR de `claude/memanto-context-analysis-vj7ux7` hacia `claude/crm-review-improve-ffjij5`, y desde ahí crear `main`, marcarla como rama por defecto y protegerla (merge solo por PR). Las sesiones de Claude Code siguen trabajando en ramas `claude/*` y entran a `main` por PR.
 4. **Más adelante**: un job de deploy por SSH (`VPS_HOST`, `VPS_SSH_KEY` como secretos) que haga `docker compose pull && docker compose up -d`. Al principio el deploy es manual.
 
-Estos pasos tocan ramas distintas a la de trabajo, así que se ejecutan cuando lo autorices.
+El primer build publica el paquete `crm` en GHCR. Si queda privado, el VPS necesita `docker login ghcr.io` con un token con permiso `read:packages`. Como el código ya es público (AGPL), lo más simple es marcar el paquete como público: la imagen no lleva secretos, que van en el `.env` del VPS. `.github/actions/` queda tal cual: son acciones compuestas que ya nadie usa, sirven de referencia si más adelante se recupera algún job de CI de upstream. `dependabot.yml` también queda: tiene las actualizaciones de versión en 0 y solo deja pasar las de seguridad.
 
 ## Fase 2: VPS
 
